@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+env/
+
+# Data & large artifacts
+data/
+checkpoints/
+*.pt
+*.pth
+*.tar.gz
+*.zip
+
+# Notebook & editor
+.ipynb_checkpoints
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
