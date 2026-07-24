@@ -1,18 +1,33 @@
-# Core deep learning libraries (updated for modern Python like 3.13)
+# Streamlit app stack (local UI: `streamlit run app.py`).
+# The FastAPI service uses requirements-api.txt (CPU-only torch, no Streamlit/plotting).
+
+# Deep learning
 torch==2.8.0
 torchvision==0.23.0
 
-# Scientific computing and data handling
+# Scientific computing
 numpy>=1.26.0
-scikit-learn>=1.3.1
 
 # Image and video processing
 Pillow>=10.1.0
-opencv-python>=4.8.1.78
+opencv-python>=4.8.1.78,<5.0  # 5.0 removed cv2.CascadeClassifier / Haar XMLs (breaks fallback)
 ultralytics>=8.0.200
 
-# Web app and plotting
-streamlit>=1.30.0
-matplotlib>=3.8.0
+# UI and plotting
+# NOTE: >=1.57 is required — the app uses width="stretch", st.metric(border=...),
+# st.container(horizontal=...) and st.badge, none of which exist in older releases.
+streamlit>=1.57.0
+altair>=5.0.0                 # frame-by-frame chart in the video tab
+pandas>=2.1.3                 # dataframe backing the Altair chart
+matplotlib>=3.8.0             # Grad-CAM colormap (core/explain.py)
+
+# Weights + config
+huggingface_hub>=0.24.0
+pydantic-settings>=2.0.0
+
+# Optional: enables the faster ONNX inference path (DEEPFAKE_USE_ONNX=1)
+onnxruntime>=1.18.0
+
+# Training/notebook only (resnet-50.ipynb) — not imported by the app at runtime
+scikit-learn>=1.3.1
 tqdm>=4.66.1
-pandas>=2.1.3

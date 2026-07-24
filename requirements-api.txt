@@ -1,0 +1,27 @@
+# FastAPI inference service — CPU-only.
+# torch/torchvision come from the PyTorch CPU index; everything else from PyPI.
+# This keeps the Docker image small (~1.5 GB vs ~6 GB with CUDA wheels).
+--index-url https://download.pytorch.org/whl/cpu
+--extra-index-url https://pypi.org/simple
+
+torch==2.8.0
+torchvision==0.23.0
+numpy>=1.26.0
+Pillow>=10.1.0
+opencv-python-headless>=4.8.1.78,<5.0  # 5.0 removed cv2.CascadeClassifier / Haar XMLs
+ultralytics>=8.0.200
+huggingface_hub>=0.24.0
+pydantic-settings>=2.0.0
+
+# API
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+
+# Hardening + observability
+slowapi>=0.1.9
+prometheus-client>=0.20.0
+
+# CPU inference optimization (Phase 2)
+onnx>=1.16.0
+onnxruntime>=1.18.0
