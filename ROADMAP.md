@@ -113,11 +113,26 @@ and `streamlit>=1.57` (the UI uses `width="stretch"`, `st.metric(border=)`, `st.
       `.pytest_cache/`/`.ruff_cache/` to `.gitignore`.
 - **Noted:** `matplotlib` ships in the API image regardless (hard dep of `ultralytics`).
 
-### ☐ Phase 4 — Docker · `feature/docker`
-- [ ] `Dockerfile` — `python:3.11-slim`, CPU-only torch, `libgl1 libglib2.0-0`,
-      `opencv-python-headless`, `<2 GB`, `EXPOSE 8000`, `uvicorn ... --workers 1`.
-- [ ] Weights not baked in; `docker-compose.yml` (api + weights volume; optional streamlit); `.dockerignore`.
-- **Done when:** `docker build` succeeds (<2 GB); `docker run` serves `/predict`.
+### ☑ Phase 4 — Docker · `feature/docker` ✅ DONE
+- [x] `Dockerfile` — `python:3.11-slim`, **CPU-only torch** (`2.8.0+cpu`, no CUDA packages),
+      `libgl1 libglib2.0-0`, headless-only OpenCV, non-root `appuser`, `HEALTHCHECK`,
+      `EXPOSE 8000`, `uvicorn ... --workers 1`.
+- [x] Weights **not baked in** — downloaded from HF at startup into `HF_HOME=/cache/huggingface`
+      (mounted volume, so restarts are instant).
+- [x] `.dockerignore` excludes weights, `onnx_models/`, notebook, training report, tests, docs,
+      and the Streamlit UI. `docker-compose.yml` validated (`docker compose config`).
+- **Bug caught by containerizing:** `omegaconf` was missing from both requirements files. The
+      `yolov8n-face.pt` checkpoint embeds an omegaconf object, so `YOLO()` crashed at startup in a
+      clean environment — it only worked locally because omegaconf was installed incidentally.
+      Now declared explicitly in `requirements.txt` and `requirements-api.txt`.
+- **Verified:** build succeeds · container starts in ~12 s · `HEALTHCHECK` reports `healthy` ·
+      `/health` `/ready` `/docs` `/metrics` `/predict` all 200 · prediction **bit-identical to the
+      host run** (`p_fake=0.7738938331604004`) · **432 MiB RAM** in use (fits the 1 GB t3.micro) ·
+      runs as non-root with exactly one OpenCV package.
+- **Image size: 2.66 GB** — above the original 2 GB goal. Not GPU wheels (torch is `+cpu`); the
+      bulk is `torch` (722 MB), `polars` via ultralytics (216 MB), `onnx` (86 MB), OpenCV (158 MB).
+      Accepted as-is by decision; trimming `onnx` (export-only) and `polars` would be the first
+      levers if it ever needs to shrink.
 
 ### ☐ Phase 5 — CI/CD + AWS EC2 deployment · `feature/deployment`
 - [ ] `DEPLOY.md` runbook: launch t3.micro (Ubuntu 24.04), **2 GB swap first**, install Docker,

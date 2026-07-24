@@ -1,0 +1,31 @@
+# Local/production run for the deepfake detection API.
+#   docker compose up --build
+#
+# Weights are not baked into the image; they download from the Hugging Face Hub on first
+# start into the `hf-cache` volume, so restarts are instant.
+
+services:
+  api:
+    build: .
+    image: deepfake-api:latest
+    container_name: deepfake-api
+    ports:
+      - "8000:8000"        # on EC2 use "80:8000" to serve on the default HTTP port
+    environment:
+      # Uncomment to require an X-API-Key header on the predict endpoints:
+      # DEEPFAKE_API_KEY: "change-me"
+      DEEPFAKE_RATE_LIMIT: "30/minute"
+      DEEPFAKE_LOG_LEVEL: "INFO"
+      # Set to 1 after exporting an ONNX model into the image/volume for ~3.6x faster CPU inference
+      DEEPFAKE_USE_ONNX: "0"
+    volumes:
+      - hf-cache:/cache/huggingface
+    restart: unless-stopped
+    # Matches the t3.micro target (1 vCPU / 1 GB RAM) so local behavior mirrors production
+    deploy:
+      resources:
+        limits:
+          memory: 900M
+
+volumes:
+  hf-cache:

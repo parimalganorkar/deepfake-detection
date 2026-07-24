@@ -12,6 +12,9 @@ numpy>=1.26.0
 Pillow>=10.1.0
 opencv-python>=4.8.1.78,<5.0  # 5.0 removed cv2.CascadeClassifier / Haar XMLs (breaks fallback)
 ultralytics>=8.0.200
+# Required to unpickle yolov8n-face.pt: the checkpoint embeds an omegaconf object from the
+# YOLOv8 version it was trained with. Without it, YOLO() raises ModuleNotFoundError.
+omegaconf>=2.3.0
 
 # UI and plotting
 # NOTE: >=1.57 is required — the app uses width="stretch", st.metric(border=...),

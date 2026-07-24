@@ -1,0 +1,49 @@
+# Keep the build context small and secrets/weights out of the image.
+
+# VCS & tooling
+.git
+.github
+.gitignore
+.claude
+.pytest_cache
+.ruff_cache
+.vscode
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info
+
+# Virtualenvs
+env/
+venv/
+.venv/
+
+# Secrets
+.env
+*.pem
+
+# Model weights & generated artifacts (downloaded from HF at runtime instead)
+*.pt
+*.pth
+*.onnx
+onnx_models/
+checkpoints/
+data/
+
+# Training artifacts — not needed to serve the API
+resnet-50.ipynb
+resnet50_report/
+
+# Streamlit UI — the API image does not serve the dashboard
+app.py
+.streamlit/
+requirements.txt
+
+# Tests & docs
+tests/
+docs/
+*.md
+pyproject.toml
+requirements-dev.txt
