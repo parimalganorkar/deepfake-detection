@@ -1,0 +1,38 @@
+# Base theme — professional light dashboard palette. Heavy visual styling lives in
+# .streamlit/style.css, which app.py injects on top of this. Only [theme] is defined, so the
+# app is locked to this clean light look.
+[theme]
+base = "light"
+primaryColor = "#4F46E5"              # indigo — buttons, active elements, focus
+backgroundColor = "#E9EDF5"           # light gray-blue page background (one notch darker)
+secondaryBackgroundColor = "#FFFFFF"  # white cards, widgets, inputs
+textColor = "#0F172A"                 # slate-900 body text
+linkColor = "#4F46E5"
+codeBackgroundColor = "#E7ECF3"
+borderColor = "#DCE1EC"
+showWidgetBorder = true
+showSidebarBorder = true
+baseRadius = "14px"
+buttonRadius = "12px"
+linkUnderline = false
+
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+headingFont = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800&display=swap"
+codeFont = "'JetBrains Mono':https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+baseFontSize = 15
+headingFontWeights = [800, 700, 700, 600, 600, 600]
+
+# Semantic colors (badges, status, chart accents)
+greenColor = "#16A34A"
+redColor = "#DC2626"
+orangeColor = "#EA580C"
+blueColor = "#2563EB"
+violetColor = "#7C3AED"
+chartCategoricalColors = ["#4F46E5", "#2563EB", "#16A34A", "#DC2626", "#EA580C", "#7C3AED", "#64748B"]
+
+[theme.sidebar]
+backgroundColor = "#E4E7F5"           # indigo-tinted panel, one notch darker
+secondaryBackgroundColor = "#FFFFFF"  # white widgets/expanders pop against the tint
+borderColor = "#D3D8EB"
+textColor = "#0F172A"
+primaryColor = "#4F46E5"
