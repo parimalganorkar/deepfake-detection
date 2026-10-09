@@ -1,6 +1,6 @@
 # FastAPI inference service — CPU-only.
 # torch/torchvision come from the PyTorch CPU index; everything else from PyPI.
-# This keeps the Docker image small (~1.5 GB vs ~6 GB with CUDA wheels).
+# This keeps the Docker image at a measured 2.66 GB; CUDA wheels would push it past ~6 GB.
 --index-url https://download.pytorch.org/whl/cpu
 --extra-index-url https://pypi.org/simple
 

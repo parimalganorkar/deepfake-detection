@@ -2,7 +2,7 @@
 
 Replaces the old ``st.warning`` / ``print`` error handling with real logging that works
 identically in the Streamlit app, the FastAPI service, and tests. JSON output is the default
-so logs are machine-parseable in production (e.g. on EC2 / in Docker).
+so logs are machine-parseable in production (e.g. in Docker).
 """
 
 from __future__ import annotations

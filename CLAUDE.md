@@ -13,8 +13,8 @@ Streamlit demo (`app.py`) with Grad-CAM overlays.
 
 **We are renovating it into a production-grade AI service** — keeping the concept and the
 trained model, and rebuilding everything around it: a clean `core/` library, a hardened
-FastAPI service, ONNX-optimized CPU inference, a beautified Streamlit UI, Docker, tests + CI,
-and an AWS EC2 deployment. The bar is: *modern, production-ready, resume-impactful.*
+FastAPI service, ONNX-optimized CPU inference, a beautified Streamlit UI, Docker, and
+tests + CI. The bar is: *modern, production-ready, resume-impactful.*
 
 ## Vision & principles
 
@@ -72,7 +72,7 @@ deepfake-detection/
 ├── requirements.txt          # Streamlit stack
 ├── requirements-api.txt      # FastAPI + CPU-only torch + onnxruntime + hardening
 ├── requirements-dev.txt      # pytest, httpx, ruff
-├── ROADMAP.md · DEPLOY.md · README.md
+├── ROADMAP.md · README.md
 └── resnet-50.ipynb · resnet50_report/   (unchanged — training artifacts)
 ```
 
@@ -96,7 +96,7 @@ never imports it, keeping that dependency out of the API's import path.
 - **`POST /predict_video`** — mp4/mov/avi/mkv upload; samples frames, aggregates via the existing
   rules (`VIDEO_AVG_THRESHOLD`, `HIGH_CONF_THRESHOLD`, `HIGHLY_FAKE_RATE_THRESHOLD`). Returns
   per-frame scores + aggregate verdict. Build **after** `/predict` is solid — video is where
-  memory pressure on the t3.micro shows up.
+  memory pressure shows up.
 - **Errors:** 400 `{"error":"..."}` for no file / bad extension / corrupt media / no face;
   413 for over size limit (10 MB image, 50 MB video — in `core/config.py`); 500 generic, **no
   stack traces leaked**.
@@ -106,38 +106,23 @@ never imports it, keeping that dependency out of the API's import path.
 
 - Base `python:3.11-slim`. Install **CPU-only torch**:
   `pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cpu`.
-  GPU wheels are the difference between a ~1.5 GB and a ~6 GB image — never let them in.
+  GPU wheels are the difference between the measured 2.66 GB image and one past ~6 GB — never
+  let them in.
 - OpenCV in slim needs `libgl1 libglib2.0-0` (`apt-get install --no-install-recommends`, then
   clean `/var/lib/apt/lists/*`) or `cv2` throws cryptic import errors on the first request.
 - Use `opencv-python-headless` in the container (no GUI deps).
-- Final image target: **under 2 GB.** If larger, you have GPU wheels — fix them.
+- Image size lands at **~2.66 GB**, accepted by decision. If it grows much past that, check
+  for GPU wheels first (`pip list | grep nvidia` should come back empty); the known bulk is
+  `torch` (722 MB), `polars` via ultralytics (216 MB), OpenCV (158 MB), and `onnx` (86 MB).
 - `EXPOSE 8000`; run `uvicorn api.main:app --host 0.0.0.0 --port 8000 --workers 1` (1 worker —
-  the t3.micro has 1 GB RAM).
+  each worker loads its own copy of the models, so keep the footprint small).
 - **Weights are not baked in.** Mount at runtime (`-v`), or let the app pull from HF at start.
 - `.dockerignore`: `.git`, `__pycache__`, `*.pyc`, `.venv`, `venv`, `env`, `.env`, `data/`,
   `checkpoints/`, `*.pt`, `*.pth`, `resnet-50.ipynb`, `resnet50_report/`, `.streamlit/`, `tests/`.
 
-## AWS deployment notes
-
-- Target: **EC2 t3.micro, Ubuntu 24.04 LTS, Free Tier.** 1 vCPU / 1 GB RAM — memory is the
-  binding constraint.
-- **2 GB swap is mandatory** before pulling/running the image (the t3.micro OOMs on a large
-  `docker pull` without swap):
-  ```
-  sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
-  sudo mkswap /swapfile && sudo swapon /swapfile
-  echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
-  ```
-- Security group: SSH (22) from **my IP only**, HTTP (80) from `0.0.0.0/0`. Never open SSH to the world.
-- Container port 8000 → host 80 via `-p 80:8000`; `--restart unless-stopped`.
-- Weights: `scp resnet50_best.pt ubuntu@<ip>:~/weights/` and mount, or rely on HF auto-download.
-- **Remind me to set a ₹100 billing alarm before launching the instance.** Stop (don't
-  terminate) when not demoing. The AWS `.pem` key lives **outside this repo** — mentioning its
-  path in a committed file is a bug.
-
 ## Non-negotiable constraints
 
-- **Never commit** `*.pt`/`*.pth`, weights directories, `.env`, AWS keys, or `.pem` paths.
+- **Never commit** `*.pt`/`*.pth`, weights directories, `.env`, or any credentials/keys.
   `.gitignore` handles the weights — don't weaken it.
 - **`core/` stays framework-free** — no `streamlit`, no `fastapi` imports.
 - **Reuse working logic** — wrap the thresholds/TTA/video aggregation, don't rewrite them.
@@ -149,7 +134,7 @@ never imports it, keeping that dependency out of the API's import path.
 
 - One feature branch per phase (see ROADMAP): `feature/foundation`, `feature/fastapi-backend`,
   `feature/onnx-optimization`, `feature/streamlit-redesign`, `feature/docker`,
-  `feature/deployment`, `feature/docs`. Do them in order — each phase unblocks the next.
+  `feature/docs`. Do them in order — each phase unblocks the next.
 - **Never commit directly to `main`.** Merge via clean commits after I've reviewed each phase.
 - **Do not `git commit`, `git push`, `git checkout` (remote-affecting), or delete branches
   without me saying so in chat.** Before any commit: run `git status` and `git diff --staged`,
@@ -167,7 +152,7 @@ never imports it, keeping that dependency out of the API's import path.
 ## Just do
 
 - Create new files under `core/`, `api/`, `tests/`, `scripts/`.
-- Write `Dockerfile`, `.dockerignore`, `docker-compose.yml`, `requirements-*.txt`, `DEPLOY.md`.
+- Write `Dockerfile`, `.dockerignore`, `docker-compose.yml`, `requirements-*.txt`.
 - Run the service locally and hit it with `curl` to verify. Run `pytest`. Run `docker build`/`run`.
 - Suggest README improvements in draft form for me to review before committing.
 - Fix your own bugs when tests fail.
@@ -187,7 +172,6 @@ never imports it, keeping that dependency out of the API's import path.
 - **`load_css()` is `@st.cache_data`** — after editing `.streamlit/style.css` you must restart
   the Streamlit server; a plain rerun serves the cached CSS.
 - **OpenCV in slim** needs `libgl1` + `libglib2.0-0` or import fails on first request.
-- **t3.micro OOMs** on a large `docker pull` unless swap is enabled first.
 - **`env/` is the local venv** — full deps (torch etc.) are a large download.
 
 **Fixed during the renovation (kept for context):**

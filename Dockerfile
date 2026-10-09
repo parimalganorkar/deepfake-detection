@@ -2,7 +2,7 @@
 #
 # Design notes:
 #   * python:3.11-slim base + CPU-only torch (requirements-api.txt pins the PyTorch CPU index).
-#     GPU wheels would take this from ~1.5 GB to ~6 GB.
+#     The image measures 2.66 GB; GPU wheels would push it past ~6 GB.
 #   * cv2 needs libgl1 + libglib2.0-0 on slim, or it throws a cryptic ImportError on first use.
 #   * ultralytics hard-requires the non-headless `opencv-python`, which collides with
 #     `opencv-python-headless`. We reinstall headless-only so exactly one cv2 owns the package.
@@ -48,5 +48,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=180s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)" || exit 1
 
-# One worker — the t3.micro deployment target has 1 GB RAM
+# One worker — each worker loads its own copy of the models, so keep the footprint small
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

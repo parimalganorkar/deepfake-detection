@@ -53,6 +53,52 @@ flowchart LR
     UI -.-> E
 ```
 
+### How a request flows
+
+```mermaid
+flowchart TD
+    A["POST /predict<br/>image upload"] --> B{"Valid?<br/>extension - size - decodable"}
+    B -- no --> E1["400 / 413<br/>uniform error body"]
+    B -- yes --> C["detect_largest_face()<br/>YOLOv8-face, Haar fallback"]
+    C --> D{"Face found?"}
+    D -- no --> E2["400 no face detected"]
+    D -- yes --> F["Crop 1.3x square<br/>resize 224, normalize"]
+    F --> G{"ONNX enabled<br/>and exported?"}
+    G -- yes --> H["ONNX Runtime<br/>~18.7 ms"]
+    G -- no --> I["PyTorch<br/>~67.2 ms"]
+    H --> J["TTA: original + h-flip<br/>average the softmax"]
+    I --> J
+    J --> K{"p_fake >= 0.50?"}
+    K -- yes --> L["label: fake"]
+    K -- no --> M["label: real"]
+    L --> N["200 JSON<br/>+ Prometheus counters"]
+    M --> N
+```
+
+Video follows the same path per sampled frame (~5 fps, faces at least 64 px, capped at 200
+frames), then applies the two-factor aggregation rule described under
+[Video response](#video-response).
+
+---
+
+## Screenshots
+
+**A detection, explained** — an AI-generated image pulled from the web, outside the training
+data, flagged at 86.2% confidence. The Grad-CAM heatmap on the right shows which facial regions
+drove the call:
+
+![Detection result with Grad-CAM](docs/screenshots/result.png)
+
+**Streamlit dashboard** — model and backend at a glance, the three-step explainer, and tabs for
+image or video analysis:
+
+![Streamlit dashboard](docs/screenshots/dashboard.png)
+
+**Interactive API docs** — FastAPI's generated OpenAPI UI at `/docs`, with the ops and inference
+endpoints and every typed schema:
+
+![OpenAPI docs](docs/screenshots/api-docs.png)
+
 ---
 
 ## Key features
@@ -87,6 +133,40 @@ CPU inference, batch size 1, 30 iterations (see [`docs/onnx_benchmark.md`](docs/
 
 ---
 
+## Engineering decisions
+
+The interesting part of this project is not the model — it is everything around it. Each choice
+below was made for a stated reason, and most were settled by measurement.
+
+- **One implementation, two front-ends.** `core/` imports neither `streamlit` nor `fastapi`, so
+  the dashboard and the API cannot drift apart — both call the same `analyze_image` /
+  `analyze_video`. The thresholds, TTA, and video aggregation were *wrapped*, not rewritten, so
+  the renovated service returns the same verdicts as the original demo.
+- **fp32 ONNX over int8 — chosen from a benchmark, not a habit.** Dynamic int8 quantization made
+  the model 4x smaller but **~15x slower** (18.7 → 277.7 ms), because dynamic quantization only
+  accelerates MatMul/Linear ops and ResNet-50 is convolution-heavy. The quantized export stays
+  available behind a flag for memory-constrained use.
+- **Models load once, at startup.** FastAPI's `lifespan` calls `warm_up()`, so the first request
+  isn't slow and a broken checkpoint fails the process immediately rather than the 50th request.
+  `/ready` reports the real state from `app.state`.
+- **Weights live on the Hugging Face Hub** — never committed, never baked into the image. That
+  keeps the repo and the image lean, removes the manual weight-placement step, and makes a fresh
+  `git clone` runnable with no setup.
+- **A two-factor video verdict.** A video is flagged fake only when mean `p(fake) >= 0.70` *and*
+  at least 25% of sampled frames score `>= 0.80`, so a single bad frame cannot condemn a real
+  video.
+- **Memory treated as a first-class constraint.** Frame sampling is capped at 200 frames, uploads
+  are read against a size limit instead of swallowed whole, and the container runs a single
+  uvicorn worker — each additional worker would load its own ~400 MiB copy of the models.
+- **Fast tests mock the models.** CI lints and tests in seconds without downloading 289 MB;
+  real-weight tests (including ONNX-vs-PyTorch parity) are opt-in via `RUN_INTEGRATION=1`.
+- **Containerizing found real bugs.** A clean environment surfaced a missing `omegaconf` — the
+  `yolov8n-face.pt` checkpoint unpickles an omegaconf object, so `YOLO()` crashed anywhere but
+  the dev machine — and OpenCV 5.0 silently dropping `cv2.CascadeClassifier`, which had broken
+  the Haar fallback. Both are now pinned and documented.
+
+---
+
 ## Quick start
 
 **Requirements:** Python 3.11. Model weights (~289 MB) download automatically on first run.
@@ -117,6 +197,31 @@ uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
 
 Interactive OpenAPI docs at **http://localhost:8000/docs**.
+
+### Option C — Docker (recommended for the API)
+
+No Python setup needed — the image is CPU-only and runs as a non-root user:
+
+```bash
+docker compose up --build
+```
+
+The API comes up on **http://localhost:8000**. Weights are *not* baked into the image; they
+download from Hugging Face on first start into the `hf-cache` volume, so restarts are instant.
+First boot takes a few minutes (289 MB of weights); after that, ~12 seconds.
+
+```bash
+docker compose ps          # STATUS shows "healthy" once the HEALTHCHECK passes
+docker compose logs -f     # structured JSON logs
+docker compose down        # stop (add -v to drop the cached weights too)
+```
+
+Plain Docker, if you prefer:
+
+```bash
+docker build -t deepfake-api .
+docker run -p 8000:8000 -v hf-cache:/cache/huggingface deepfake-api
+```
 
 ### Enable the faster ONNX backend (optional)
 
@@ -230,7 +335,12 @@ deepfake-detection/
 ├── scripts/export_onnx.py    # ONNX export + quantization + benchmark
 ├── .streamlit/               # Dashboard theme + injected CSS
 ├── .github/workflows/ci.yml  # Lint + tests on every push/PR
-├── docs/                     # Benchmarks and screenshots
+├── Dockerfile                # CPU-only API image (non-root, HEALTHCHECK)
+├── docker-compose.yml        # One-command run + cached-weights volume
+├── requirements.txt          # Streamlit stack
+├── requirements-api.txt      # API stack (CPU-only torch)
+├── requirements-dev.txt      # + pytest, httpx, ruff
+├── docs/                     # Benchmark notes and screenshots
 └── resnet-50.ipynb           # Original training notebook (reference)
 ```
 
@@ -248,6 +358,11 @@ RUN_INTEGRATION=1 pytest                  # + end-to-end tests with real weights
 
 The fast suite mocks the models so **CI runs without downloading 289 MB of weights**. Integration
 tests (real inference, ONNX-vs-PyTorch parity) are opt-in via `RUN_INTEGRATION=1`.
+
+**Verified state:** `ruff` clean - 17 passed / 2 skipped (fast) - 19 passed (integration, real
+weights) - Streamlit renders with zero exceptions - every API endpoint returns 200 - and the
+containerized prediction is bit-identical to the host run (`p_fake=0.7738938331604004`) while
+using ~432 MiB of RAM.
 
 ---
 
@@ -279,10 +394,6 @@ start instantly. Set `HF_TOKEN` if you hit Hub rate limits.
 Training details are in [`resnet-50.ipynb`](resnet-50.ipynb); curves and the confusion matrix are
 in [`resnet50_report/`](resnet50_report/).
 
-> **Note on scope:** this model is a research prototype trained on academic datasets. It is not
-> calibrated for high-stakes or forensic use, and accuracy degrades on compression, unusual
-> lighting, and manipulation methods outside its training distribution.
-
 ---
 
 ## Roadmap
@@ -293,15 +404,8 @@ Detailed plan in [`ROADMAP.md`](ROADMAP.md).
 - [x] **FastAPI backend** — endpoints, auth, rate limiting, metrics, tests, CI
 - [x] **CPU optimization** — ONNX export, quantization, benchmarking
 - [x] **Streamlit dashboard** — professional light UI with Grad-CAM and KPI tiles
-- [ ] **Docker** — CPU-only image (<2 GB), `docker-compose`
-- [ ] **AWS EC2 deployment** — live demo with deployment runbook
+- [x] **Docker** — CPU-only image, `docker-compose`, healthcheck, non-root user
+- [x] **Docs & polish** — architecture diagrams, engineering decisions, usage examples
 
----
-
-## License & usage
-
-No license has been specified for this repository yet, so all rights are reserved by default.
-If you would like to use or build on this work, please open an issue or get in touch.
-
-The trained weights on the Hugging Face Hub, and the datasets used to train them
-(WildDeepfake, FaceForensics++), remain subject to their own licenses and terms of use.
+All planned phases are complete. Cloud deployment was considered and deliberately dropped from
+scope: the service is container-first and runs anywhere Docker runs.

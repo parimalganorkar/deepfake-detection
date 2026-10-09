@@ -10,7 +10,7 @@ services:
     image: deepfake-api:latest
     container_name: deepfake-api
     ports:
-      - "8000:8000"        # on EC2 use "80:8000" to serve on the default HTTP port
+      - "8000:8000"        # use "80:8000" to serve on the default HTTP port
     environment:
       # Uncomment to require an X-API-Key header on the predict endpoints:
       # DEEPFAKE_API_KEY: "change-me"
@@ -21,7 +21,7 @@ services:
     volumes:
       - hf-cache:/cache/huggingface
     restart: unless-stopped
-    # Matches the t3.micro target (1 vCPU / 1 GB RAM) so local behavior mirrors production
+    # Keeps memory honest — the API measures ~432 MiB in use, well under this ceiling
     deploy:
       resources:
         limits:
