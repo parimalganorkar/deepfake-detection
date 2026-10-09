@@ -21,6 +21,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
+          # ultralytics hard-requires the non-headless opencv-python, which overrides the
+          # headless pin and needs libGL.so.1 — absent on bare runners, so `import cv2` dies
+          # during pytest collection. Force headless-only, exactly as the Dockerfile does.
+          pip uninstall -y opencv-python opencv-python-headless
+          pip install "opencv-python-headless>=4.8.1.78,<5.0"
+          python -c "import cv2; print('cv2 OK', cv2.__version__)"
 
       - name: Lint (ruff)
         run: ruff check .

@@ -172,6 +172,11 @@ never imports it, keeping that dependency out of the API's import path.
 - **`load_css()` is `@st.cache_data`** — after editing `.streamlit/style.css` you must restart
   the Streamlit server; a plain rerun serves the cached CSS.
 - **OpenCV in slim** needs `libgl1` + `libglib2.0-0` or import fails on first request.
+- **`ultralytics` overrides the headless OpenCV pin.** It hard-requires `opencv-python`
+  (non-headless), which wins over `opencv-python-headless` in resolution and then needs
+  `libGL.so.1`. Both the `Dockerfile` **and** `ci.yml` must force a headless-only reinstall
+  after `pip install`, or `import cv2` dies — in CI that surfaces as pytest exit code 2
+  (collection error), not a test failure.
 - **`env/` is the local venv** — full deps (torch etc.) are a large download.
 
 **Fixed during the renovation (kept for context):**
