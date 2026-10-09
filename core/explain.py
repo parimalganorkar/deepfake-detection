@@ -1,8 +1,9 @@
 """Grad-CAM explainability.
 
 Kept separate from ``inference.py`` because it depends on matplotlib (for the colormap) and is
-only used by the Streamlit UI. The FastAPI service does not import this module, so the API
-Docker image stays free of matplotlib.
+only used by the Streamlit UI, so the API never pulls plotting code into its import path. Note
+this does not keep matplotlib out of the API image — ``ultralytics`` hard-requires it, so it
+ships regardless; the separation is about clean layering, not image size.
 """
 
 from __future__ import annotations

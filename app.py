@@ -1,6 +1,6 @@
 # app.py — AI Deepfake Detector (Streamlit UI)
-# Premium dark UI. All inference logic lives in the framework-free `core/` package (shared with
-# the FastAPI service). This file is presentation only: layout, styling, and UX feedback.
+# Premium light dashboard UI. All inference logic lives in the framework-free `core/` package
+# (shared with the FastAPI service). This file is presentation only: layout, styling, and UX.
 
 import io
 import os
