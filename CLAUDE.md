@@ -177,6 +177,10 @@ never imports it, keeping that dependency out of the API's import path.
   `libGL.so.1`. Both the `Dockerfile` **and** `ci.yml` must force a headless-only reinstall
   after `pip install`, or `import cv2` dies — in CI that surfaces as pytest exit code 2
   (collection error), not a test failure.
+- **Verify with bare `pytest`, not `python -m pytest`.** The `-m` form silently puts the CWD on
+  `sys.path`; CI runs the bare console script, which does not. That gap hid a real bug where
+  `core` and `api` were unimportable in CI. `pyproject.toml` now sets `pythonpath = ["."]` so
+  both forms work — don'''t remove it.
 - **`env/` is the local venv** — full deps (torch etc.) are a large download.
 
 **Fixed during the renovation (kept for context):**

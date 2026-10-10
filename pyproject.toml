@@ -1,6 +1,10 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+# Put the repo root on sys.path so `core` and `api` import under a bare `pytest` call.
+# Without this, only `python -m pytest` works (it adds CWD implicitly) and CI fails with
+# ModuleNotFoundError during collection.
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 100
